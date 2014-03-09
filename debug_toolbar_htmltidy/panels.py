@@ -12,6 +12,8 @@ from django.utils.safestring import mark_safe
 
 from debug_toolbar.panels import Panel
 
+_HTML_TYPES = ('text/html', 'application/xhtml+xml')
+
 
 class HTMLTidyDebugPanel(Panel):
     name = "HTMLTidy"
@@ -39,6 +41,14 @@ class HTMLTidyDebugPanel(Panel):
         return ''
 
     def process_response(self, request, response):
+        # Check for responses that can't or shouldn't be validated
+        content_encoding = response.get('Content-Encoding', '')
+        content_type = response.get('Content-Type', '').split(';')[0]
+        if any((getattr(response, 'streaming', False),
+                'gzip' in content_encoding,
+                content_type not in _HTML_TYPES)):
+            return response
+
         document, errors = tidy_document(response.content,
                                          options={'numeric-entities': 1})
         self.log_data = (document, errors)
